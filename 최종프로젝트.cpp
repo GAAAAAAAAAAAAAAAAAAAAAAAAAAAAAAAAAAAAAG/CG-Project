@@ -87,6 +87,7 @@ struct OBJECT {
 
 		int v_incount = 0;
 		int f_incount = 0;
+
 		while (in >> s)
 		{
 			if (s == "v") {
@@ -242,6 +243,11 @@ struct SPHERE :OBJECT
 		glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(glm::vec3), normaldata, GL_STATIC_DRAW);
 		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(2);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
+		glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(glm::vec3), texturedata, GL_STATIC_DRAW);
+		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(3);
 	}
 
 	void draw(int shaderID)
@@ -249,6 +255,9 @@ struct SPHERE :OBJECT
 		unsigned int modelLocation = glGetUniformLocation(shaderID, "model");
 		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(GetTransform() * GetmodelTransform()));
 		glBindVertexArray(vao);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, textures[0]);
 		glDrawArrays(GL_TRIANGLES, 0, vertex_count);
 	}
 
@@ -420,6 +429,9 @@ bool downKeyPressed = false;
 bool leftKeyPressed = false;
 bool rightKeyPressed = false;
 
+//카메라
+bool viewpoint = false;	//false : 3인칭, true : 1인칭
+
 void make_shaderProgram();
 void make_vertexShaders();
 void make_fragmentShaders();
@@ -557,12 +569,17 @@ GLvoid drawScene()
 
 	//s r t p 코드 작성시에는 반대 방향으로.
 	model = glm::mat4(1.0f);
-	sphere.draw(shaderProgramID);
+	if (!viewpoint)
+	{
+
+		sphere.draw(shaderProgramID);
+	}
 	minicube.draw(shaderProgramID,1);
 	skybox.draw(shaderProgramID,1);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	cube.draw(shaderProgramID, 1);
 	//투명도 그리고 싶으면 여기에 객체 그리기
 	glDisable(GL_BLEND);
 
@@ -583,12 +600,14 @@ void InitBuffer()
 
 	cube.Init();
 	minicube.Init();
-	minicube.parent = &cube;
+	//minicube.parent = &cube;
 	sphere.Init();
 	skybox.Init();
 
 	skybox.worldmatrix.position.y = 10;
 	skybox.worldmatrix.scale = glm::vec3(50.0, 50.0, 50.0);
+
+	cube.worldmatrix.position.z = 10;
 
 	minicube.worldmatrix.position.z = -3;
 	minicube.modelmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
@@ -675,6 +694,16 @@ char* filetobuf(const char* file)
 GLvoid Keyboard(unsigned char key, int x, int y)
 {
 	switch (key) {
+	case 'j':
+		if (JSelection == 0)
+		{
+			JSelection = 1;
+		}
+		
+		break;
+	case 'v':
+		viewpoint = !viewpoint;
+		break;
 	case 'q':
 		glutLeaveMainLoop();
 		break;
@@ -723,75 +752,75 @@ void moveSphere()
 	if (upKeyPressed)
 	{
 		sphere.worldmatrix.position.z += speed;
+		sphere.modelmatrix.rotation.x += speed*50;
 	}
 	if (downKeyPressed)
 	{
 		sphere.worldmatrix.position.z -= speed;
+		sphere.modelmatrix.rotation.x -= speed*50;
 	}
 	if (leftKeyPressed)
 	{
 		sphere.worldmatrix.position.x += speed;
+		sphere.modelmatrix.rotation.z -= speed * 50;
 	}
 	if (rightKeyPressed)
 	{
 		sphere.worldmatrix.position.x -= speed;
+		sphere.modelmatrix.rotation.z += speed * 50;
 	}
 }
 
-
-
-//GLvoid Mouse(int button, int state, int x, int y)
-//{
-//	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
-//	{
-//		ox = x;
-//		oy = y;
-//		left_button = true;
-//	}
-//	else
-//	{
-//		ox = 0;
-//		oy = 0;
-//		pre_x_angle = x_angle;
-//		pre_y_angle = y_angle;
-//		left_button = false;
-//	}
-//}
-
-//GLvoid Motion(int x, int y)
-//{
-//	if (left_button)
-//	{
-//		y_angle = x - ox;
-//		x_angle = y - oy;
-//		x_angle += pre_x_angle;
-//		y_angle += pre_y_angle;
-//
-//		y_angle /= 2;
-//		x_angle /= 2;
-//	}
-//	glutPostRedisplay();
-//}
-
-
+GLvoid Mouse(int button, int state, int x, int y)
+{
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+	{
+		ox = x;
+		oy = y;
+		left_button = true;
+	}
+	else
+	{
+		ox = 0;
+		oy = 0;
+		pre_x_angle = x_angle;
+		pre_y_angle = y_angle;
+		left_button = false;
+	}
+}
 
 GLvoid Motion(int x, int y)
 {
-	ox = x;
-	oy = y;
-	left_button = true;
-	
-	float x_diff = x - ox;
-	float y_diff = y - oy;
-	cameraDirection += x_diff / 2;
+	if (left_button)
+	{
+		y_angle = x - ox;
+		x_angle = y - oy;
+		x_angle += pre_x_angle;
+		y_angle += pre_y_angle;
 
-	// 카메라 높이와 거리를 구와의 상대적인 위치로 설정
-	cameraPos.x = sphere.worldmatrix.position.x + cameraDistance * sin(glm::radians(cameraAngle));
-	cameraPos.y = sphere.worldmatrix.position.y + cameraHeight;
-	cameraPos.z = sphere.worldmatrix.position.z + cameraDistance * cos(glm::radians(cameraAngle));
-	
+		y_angle /= 2;
+		x_angle /= 2;
+	}
 	glutPostRedisplay();
 }
+
+//GLvoid Motion(int x, int y)
+//{
+//	ox = x;
+//	oy = y;
+//	left_button = true;
+//	
+//	float x_diff = x - ox;
+//	float y_diff = y - oy;
+//	cameraDirection += x_diff / 2;
+//
+//	// 카메라 높이와 거리를 구와의 상대적인 위치로 설정
+//	cameraPos.x = sphere.worldmatrix.position.x + cameraDistance * sin(glm::radians(cameraAngle));
+//	cameraPos.y = sphere.worldmatrix.position.y + cameraHeight;
+//	cameraPos.z = sphere.worldmatrix.position.z + cameraDistance * cos(glm::radians(cameraAngle));
+//	
+//	glutPostRedisplay();
+//}
 
 GLvoid mouseWheel(int button, int dir, int x, int y)
 {
@@ -823,27 +852,26 @@ GLvoid TimerFunction(int value)
 	switch (value)
 	{
 	case 1:
-
+		sphere.worldmatrix.scale = glm::vec3(1, 1, 1);
 		moveSphere();
-
-		sphere.worldmatrix.position.y += jumpVelocity; // 구에 점프 속도 적용
-		sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f+jumpVelocity, 1.0f);
-
+		if (JSelection == 1)
+		{
+			sphere.worldmatrix.position.y += jumpVelocity; // 구에 점프 속도 적용
+			//sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity, 1.0f);
+			sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity + jumpInitialVelocity/2, 1.0f);
+			// 중력 적용
+			jumpVelocity -= gravity;
+		}
 		// 카메라 위치 조정
 		cameraPos.x = sphere.worldmatrix.position.x + cameraDistance * sin(glm::radians(cameraAngle));
-		cameraPos.y = sphere.worldmatrix.position.y + cameraHeight;
-		cameraPos.z = sphere.worldmatrix.position.z + cameraDistance * cos(glm::radians(cameraAngle));
-
-		//// 카메라가 구를 바라보도록 방향 설정
-		//cameraDirection = glm::normalize(sphere.worldmatrix.position - cameraPos);
-
-		// 중력 적용
-		jumpVelocity -= gravity;
+		cameraPos.y = sphere.worldmatrix.position.y + cameraHeight + viewpoint * -3.1;
+		cameraPos.z = sphere.worldmatrix.position.z + cameraDistance * cos(glm::radians(cameraAngle)) + viewpoint * 17;
 
 		// 땅에 닿았을 때의 처리
 		if (sphere.worldmatrix.position.y <= initialHeight) {
 			sphere.worldmatrix.position.y = initialHeight;
 			jumpVelocity = jumpInitialVelocity; // 다시 초기 점프 속도로 설정
+			JSelection = 0;
 		}
 
 		break;
@@ -860,7 +888,7 @@ void InitTexture()
 	stbi_set_flip_vertically_on_load(true);
 	glGenTextures(8, textures);
 
-	unsigned char* data1 = stbi_load("test.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data1 = stbi_load("crystal.png", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[0]
 	glBindTexture(GL_TEXTURE_2D, textures[0]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
