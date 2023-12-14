@@ -21,6 +21,7 @@ random_device rd;
 mt19937 gen(rd());
 uniform_real_distribution<double> XYdis(-1, 1);
 uniform_real_distribution<double> dis(0.0, 1.0);
+uniform_int_distribution<int> onoffrandom(0, 400);
 
 void InitTexture();
 int widthImage, heightImage, numberOfChannel;
@@ -128,6 +129,8 @@ struct OBJECT {
 
 struct CUBE :OBJECT
 {
+	double width = 0.25, depth = 0.25, height = 0.25;
+
 	void Init()
 	{
 		for (int i = 0; i < vertex_count; i++)
@@ -213,6 +216,10 @@ CUBE skybox;
 CUBE minicube;
 CUBE checkpoint[7];
 CUBE rotatePlane[5];
+CUBE onoffPlane[51];
+int onoffPlaneNum = 51;
+int onoffPlaneTime[51];
+bool onoff[51];
 
 struct SPHERE :OBJECT
 {
@@ -274,6 +281,7 @@ struct SPHERE :OBJECT
 	}
 };
 SPHERE sphere;
+SPHERE axis;
 
 struct PYRAMID :OBJECT
 {
@@ -418,7 +426,7 @@ float cameraAngle = 180.0f; // 카메라 각도
 bool start = true;
 
 float w, a, s, d;
-float speed = 0.6;
+float speed = 0.3;
 int JSelection = 0;
 int JCnt = 0;
 float jumpSize = 0.1;
@@ -430,6 +438,8 @@ bool upKeyPressed = false;
 bool downKeyPressed = false;
 bool leftKeyPressed = false;
 bool rightKeyPressed = false;
+bool falling = false;
+int checknum = 0;
 
 //카메라
 bool viewpoint = false;	//false : 3인칭, true : 1인칭
@@ -474,9 +484,18 @@ void main(int argc, char** argv) //--- 윈도우 출력하고 콜백함수 설정
 	skybox.ReadObj("cube.obj");
 	minicube.ReadObj("cube.obj");
 	sphere.ReadObj("sphere.obj");
+	axis.ReadObj("sphere.obj");
 	for (int i = 0; i < 7; i++)
 	{
 		checkpoint[i].ReadObj("cube.obj");
+	}
+	for (int i = 0; i < 5; i++)
+	{
+		rotatePlane[i].ReadObj("cube.obj");
+	}
+	for (int i = 0; i < onoffPlaneNum; i++)
+	{
+		onoffPlane[i].ReadObj("cube.obj");
 	}
 
 	//--- 세이더 읽어와서 세이더 프로그램 만들기
@@ -585,6 +604,17 @@ GLvoid drawScene()
 	{
 		checkpoint[i].draw(shaderProgramID, 2);
 	}
+	for (int i = 0; i < 5; i++)
+	{
+		rotatePlane[i].draw(shaderProgramID, 3);
+	}
+	for (int i = 0; i < onoffPlaneNum; i++)
+	{
+		if (onoff[i])
+		{
+			onoffPlane[i].draw(shaderProgramID, 4);
+		}
+	}
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -611,6 +641,7 @@ void InitBuffer()
 	minicube.Init();
 	//minicube.parent = &cube;
 	sphere.Init();
+	axis.Init();
 	skybox.Init();
 	for (int i = 0; i < 7; i++)
 	{
@@ -618,6 +649,57 @@ void InitBuffer()
 		checkpoint[i].worldmatrix.position.y -= 0.5;
 		checkpoint[i].worldmatrix.position.z = i * 100;
 		checkpoint[i].worldmatrix.scale = glm::vec3(7.0, 0.3, 7.0);
+		checkpoint[i].width = 7.0/2;
+		checkpoint[i].depth = 0.3/2;
+		checkpoint[i].height = 7.0/2;
+	}
+	for (int i = 0; i < 5; i++)
+	{
+		rotatePlane[i].Init();
+		rotatePlane[i].worldmatrix.position.y -= 0.5;
+		rotatePlane[i].worldmatrix.scale = glm::vec3(10.0, 0.3, 10.0);
+		rotatePlane[i].width = 10.0 / 2;
+		rotatePlane[i].depth = 0.3 / 2;
+		rotatePlane[i].height = 10.0 / 2;
+	}
+	rotatePlane[0].worldmatrix.position.x = -5;
+	rotatePlane[1].worldmatrix.position.x = 0;
+	rotatePlane[2].worldmatrix.position.x = 5;
+	rotatePlane[3].worldmatrix.position.x = -5;
+	rotatePlane[4].worldmatrix.position.x = 0;
+	rotatePlane[0].worldmatrix.position.z = 15;
+	rotatePlane[1].worldmatrix.position.z = 35;
+	rotatePlane[2].worldmatrix.position.z = 55;
+	rotatePlane[3].worldmatrix.position.z = 75;
+	rotatePlane[4].worldmatrix.position.z = 90;
+	rotatePlane[4].worldmatrix.scale = glm::vec3(6.0, 0.3, 6.0);
+	rotatePlane[4].width = 6.0 / 2;
+	rotatePlane[4].depth = 0.3 / 2;
+	rotatePlane[4].height = 6.0 / 2;
+
+	for (int i = 0; i < onoffPlaneNum; i++)
+	{
+		onoffPlane[i].Init();
+		onoffPlane[i].worldmatrix.position.y -= 0.5;
+		onoffPlane[i].worldmatrix.position.z = (i%17) * 5 + 110;
+		if (i >= 0 && i < 17)
+		{
+			onoffPlane[i].worldmatrix.position.x = -5;
+		}
+		else if (i >= 17 && i < 34)
+		{
+			onoffPlane[i].worldmatrix.position.x = 0;
+		}
+		else if (i >= 34 && i < 51)
+		{
+			onoffPlane[i].worldmatrix.position.x = 5;
+		}
+		onoffPlane[i].worldmatrix.scale = glm::vec3(5.0, 0.3, 5.0);
+		onoffPlane[i].width = 5.0 / 2;
+		onoffPlane[i].depth = 0.3 / 2;
+		onoffPlane[i].height = 5.0 / 2;
+		onoffPlaneTime[i] = onoffrandom(gen);
+		onoff[i] = true;
 	}
 
 	sphere.worldmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
@@ -873,6 +955,13 @@ GLvoid WindowToOpenGL(int mouseX, int mouseY, float& x, float& y)
 
 glm::vec3 prevSpherePosition = sphere.worldmatrix.position;
 
+float fall = 0;
+
+void collision()
+{
+
+}
+
 GLvoid TimerFunction(int value)
 {
 	switch (value)
@@ -897,7 +986,108 @@ GLvoid TimerFunction(int value)
 		if (sphere.worldmatrix.position.y <= initialHeight) {
 			sphere.worldmatrix.position.y = initialHeight;
 			jumpVelocity = jumpInitialVelocity; // 다시 초기 점프 속도로 설정
-			JSelection = 0;
+			JSelection = 0; 
+		}
+
+		//회전하는 판
+		for (int i = 0; i < 5; i++)
+		{
+			if (i % 2 == 0)
+			{
+				rotatePlane[i].worldmatrix.rotation.y += 1;
+			}
+			if (i % 2 == 1)
+			{
+				rotatePlane[i].worldmatrix.rotation.y -= 1;
+			}
+		}
+		//온-오프 판
+		for (int i = 0; i < onoffPlaneNum; i++)
+		{
+			onoffPlaneTime[i]++;
+			if (onoffPlaneTime[i] > 0 && onoffPlaneTime[i] < 200)
+			{
+				onoff[i] = true;
+			}
+			else if (onoffPlaneTime[i] > 200 && onoffPlaneTime[i] < 400)
+			{
+				onoff[i] = false;
+			}
+			else if (onoffPlaneTime[i] > 400)
+			{
+				onoffPlaneTime[i] = 0;
+			}
+		}
+
+		falling = true;
+		//충돌 체크
+		for (int i = 0; i < 7; i++)
+		{
+			if(((sphere.worldmatrix.position.x > (checkpoint[i].worldmatrix.position.x - checkpoint[i].width))
+				&& (sphere.worldmatrix.position.x < (checkpoint[i].worldmatrix.position.x + checkpoint[i].width))
+				&& (sphere.worldmatrix.position.z > (checkpoint[i].worldmatrix.position.z - checkpoint[i].height))
+				&& (sphere.worldmatrix.position.z < (checkpoint[i].worldmatrix.position.z + checkpoint[i].height)))
+				|| JSelection ==1 )
+			{
+				falling = false;
+				break;
+			}
+		}
+		for (int i = 0; i < 5; i++)	// rotatePlane
+		{
+			if (((sphere.worldmatrix.position.x > (rotatePlane[i].worldmatrix.position.x - rotatePlane[i].width))
+				&& (sphere.worldmatrix.position.x < (rotatePlane[i].worldmatrix.position.x + rotatePlane[i].width))
+				&& (sphere.worldmatrix.position.z > (rotatePlane[i].worldmatrix.position.z - rotatePlane[i].height))
+				&& (sphere.worldmatrix.position.z < (rotatePlane[i].worldmatrix.position.z + rotatePlane[i].height)))
+				|| JSelection == 1)
+			{
+				if (i % 2 == 0)
+				{
+
+				}
+				else if (i % 2 == 1)
+				{
+
+				}
+				falling = false;
+				break;
+			}
+		}
+		for (int i = 0; i < onoffPlaneNum; i++)	//on-off Plane
+		{
+			if (((sphere.worldmatrix.position.x > (onoffPlane[i].worldmatrix.position.x - onoffPlane[i].width))
+				&& (sphere.worldmatrix.position.x < (onoffPlane[i].worldmatrix.position.x + onoffPlane[i].width))
+				&& (sphere.worldmatrix.position.z > (onoffPlane[i].worldmatrix.position.z - onoffPlane[i].height))
+				&& (sphere.worldmatrix.position.z < (onoffPlane[i].worldmatrix.position.z + onoffPlane[i].height)))
+				|| JSelection == 1)
+			{
+				if (onoff[i])
+				{
+					falling = false;
+				}
+				break;
+			}
+		}
+		//
+		/*if (sphere.worldmatrix.position.z > 100 && sphere.worldmatrix.position.z < 200)
+		{
+			checknum = 1;
+		}*/
+		
+		//테스트 확인용
+		checknum = 1;
+
+		//추락하기
+		if (falling)
+		{
+			fall += 0.3;
+			sphere.worldmatrix.position.y -= fall;
+			if (sphere.worldmatrix.position.y < -10)
+			{
+				sphere.worldmatrix.position = checkpoint[checknum].worldmatrix.position;
+				falling = false;
+				fall = 0;
+			}
 		}
 
 		//큐브맵 같이 이동
