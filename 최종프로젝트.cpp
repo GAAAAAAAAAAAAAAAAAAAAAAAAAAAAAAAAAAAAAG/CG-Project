@@ -1129,6 +1129,9 @@ void collision()
 {
 
 }
+float angles[5]{};
+int sibal;
+glm::vec3 destination;
 
 GLvoid TimerFunction(int value)
 {
@@ -1169,10 +1172,22 @@ GLvoid TimerFunction(int value)
 				if (i % 2 == 0)
 				{
 					rotatePlane[i].worldmatrix.rotation.y += 1;
+					if (!upKeyPressed && !downKeyPressed && !rightKeyPressed && !leftKeyPressed) {
+						angles[i] += 1;
+					}
+					else {
+						angles[i] = 0;
+					}
 				}
 				if (i % 2 == 1)
 				{
 					rotatePlane[i].worldmatrix.rotation.y -= 1;
+					if (!upKeyPressed && !downKeyPressed && !rightKeyPressed && !leftKeyPressed) {
+						angles[i] -= 1;
+					}
+					else {
+						angles[i] = 0;
+					}
 				}
 			}
 			//온-오프 판
@@ -1251,20 +1266,27 @@ GLvoid TimerFunction(int value)
 					&& (sphere.worldmatrix.position.x < (rotatePlane[i].worldmatrix.position.x + rotatePlane[i].width))
 					&& (sphere.worldmatrix.position.z > (rotatePlane[i].worldmatrix.position.z - rotatePlane[i].height))
 					&& (sphere.worldmatrix.position.z < (rotatePlane[i].worldmatrix.position.z + rotatePlane[i].height)))
-					|| JSelection == 1)
+					)
 				{
-					if (i % 2 == 0)
-					{
-
+					if (sibal == 1) {
+						destination = sphere.worldmatrix.position;
+						sibal = 2;
 					}
-					else if (i % 2 == 1)
-					{
-
+					if (!upKeyPressed && !downKeyPressed && !rightKeyPressed && !leftKeyPressed) {
+						sphere.worldmatrix.position.x = rotatePlane[i].worldmatrix.position.x + 4 * cos(-angles[i] * 2 * 3.141592 / 180.0);
+						sphere.worldmatrix.position.z = rotatePlane[i].worldmatrix.position.z + 4 * sin(-angles[i] * 2 * 3.141592 / 180.0);
 					}
+					/*else {
+						if (upKeyPressed) {
+							if (i % 2 == 0) sphere.worldmatrix.position.x -= speed /2;
+							else sphere.worldmatrix.position.x += speed / 2;
+						}
+					}*/
 					falling = false;
 					break;
 				}
 			}
+
 			for (int i = 0; i < onoffPlaneNum; i++)	//on-off Plane
 			{
 				if (((sphere.worldmatrix.position.x > (onoffPlane[i].worldmatrix.position.x - onoffPlane[i].width))
