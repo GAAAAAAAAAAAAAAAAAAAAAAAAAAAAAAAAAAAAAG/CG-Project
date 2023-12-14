@@ -217,6 +217,8 @@ CUBE skybox;
 CUBE minicube;
 CUBE checkpoint[7];
 CUBE rotatePlane[5];
+double theta = 0;
+double W, H;
 CUBE onoffPlane[51];
 int onoffPlaneNum = 51;
 int onoffPlaneTime[51];
@@ -232,6 +234,10 @@ int punchDirection[4];
 double punchMoveCnt[4];
 CUBE trampoline[3];
 int trampolineNum = 3;
+CUBE jumpmapcube[10];
+int jumpmapcubeNum = 10;
+CUBE startTitle;
+CUBE endTitle;
 
 struct SPHERE :OBJECT
 {
@@ -248,7 +254,7 @@ struct SPHERE :OBJECT
 		}
 		glGenVertexArrays(1, &vao); //--- VAO 를 지정하고 할당하기
 		glBindVertexArray(vao); //--- VAO를 바인드하기
-		glGenBuffers(4, vbo); //--- 3개의 VBO를 지정하고 할당하기
+		glGenBuffers(3, vbo); //--- 3개의 VBO를 지정하고 할당하기
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 		glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(glm::vec3), vertexdata, GL_STATIC_DRAW);
@@ -265,10 +271,10 @@ struct SPHERE :OBJECT
 		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(2);
 
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
+		/*glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
 		glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(glm::vec3), texturedata, GL_STATIC_DRAW);
 		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(3);
+		glEnableVertexAttribArray(3);*/
 	}
 
 	void draw(int shaderID)
@@ -403,6 +409,12 @@ glm::mat4 model = glm::mat4(1.0f);
 glm::mat4 view = glm::mat4(1.0f);
 glm::mat4 projection = glm::mat4(1.0f);
 
+glm::vec3 cameraPos3 = glm::vec3(0.0f, -0.5f, 0.0f); //--- 카메라 위치
+glm::vec3 cameraDirection3 = glm::vec3(0.0f, 0.0f, 0.0f); //--- 카메라 바라보는 방향
+glm::vec3 cameraUp3 = glm::vec3(0.0f, 0.0f, 1.0f); //--- 카메라 위쪽 방향
+glm::mat4 view3 = glm::mat4(1.0f);
+glm::mat4 pTransform3 = glm::mat4(1.0f);
+
 GLuint vao, vbo[3];
 GLuint TriPosVbo, TriColorVbo;
 
@@ -436,6 +448,7 @@ float cameraHeight = 3.0f; // 카메라의 높이
 float cameraAngle = 180.0f; // 카메라 각도
 
 bool start = true;
+bool endpoint = false;
 
 float w, a, s, d;
 float speed = 0.3;
@@ -452,6 +465,8 @@ bool leftKeyPressed = false;
 bool rightKeyPressed = false;
 bool falling = false;
 int checknum = 0;
+
+bool adminmode = false;
 
 //카메라
 bool viewpoint = false;	//false : 3인칭, true : 1인칭
@@ -526,6 +541,12 @@ void main(int argc, char** argv) //--- 윈도우 출력하고 콜백함수 설정
 	{
 		trampoline[i].ReadObj("cube.obj");
 	}
+	for (int i = 0; i < jumpmapcubeNum; i++)
+	{
+		jumpmapcube[i].ReadObj("cube.obj");
+	}
+	startTitle.ReadObj("cube.obj");
+	endTitle.ReadObj("cube.obj");
 
 	//--- 세이더 읽어와서 세이더 프로그램 만들기
 	make_shaderProgram(); //--- 세이더 프로그램 만들기
@@ -593,41 +614,13 @@ GLvoid drawScene()
 	unsigned int objColorLocation = glGetUniformLocation(shaderProgramID, "objectColor"); //--- object Color값 전달: (1.0, 0.5, 0.3)의 색
 	glUniform3f(objColorLocation, 1.0, 0.5, 0.3);
 
-	if (start)
-	{
-		start = false;
-	}
-
-	model = glm::mat4(1.0f);
-
-	//축 그리기
-	for (int i = 0; i < 3; i++)
-	{
-		// 색상 바꾸기
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(GLfloat), XYZcolors[i * 2], GL_STATIC_DRAW);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(1);
-
-		// modelTransform 변수에 변환 값 적용하기
-		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(model));
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(GLfloat), XYZShape[i], GL_STATIC_DRAW);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(0);
-
-		glLineWidth(2.0);
-		glDrawArrays(GL_LINES, 0, 2);
-	}
-
 	//s r t p 코드 작성시에는 반대 방향으로.
 	model = glm::mat4(1.0f);
 	if (!viewpoint)
 	{
 		sphere.draw(shaderProgramID);
 	}
-	minicube.draw(shaderProgramID,1);
+	//minicube.draw(shaderProgramID,1);
 	skybox.draw(shaderProgramID,1);
 	for (int i = 0; i < 7; i++)
 	{
@@ -644,13 +637,7 @@ GLvoid drawScene()
 			onoffPlane[i].draw(shaderProgramID, 4);
 		}
 	}
-	for (int i = 0; i < glassPlaneNum; i++)
-	{
-		if (glassrandom[i] >= 0)
-		{
-			glassPlane[i].draw(shaderProgramID, 5);
-		}
-	}
+	
 	for (int i = 0; i < punchNum; i++)
 	{
 		punchbox[i].draw(shaderProgramID, 6);
@@ -661,12 +648,46 @@ GLvoid drawScene()
 	{
 		trampoline[i].draw(shaderProgramID, 7);
 	}
+	for (int i = 0; i < jumpmapcubeNum; i++)
+	{
+		jumpmapcube[i].draw(shaderProgramID, 2);
+	}
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	//투명도 그리고 싶으면 여기에 객체 그리기
+	for (int i = 0; i < glassPlaneNum; i++)
+	{
+		if (glassrandom[i] >= 0)
+		{
+			glassPlane[i].draw(shaderProgramID, 5);
+		}
+	}
 	//cube.draw(shaderProgramID, 1);
 	glDisable(GL_BLEND);
+
+	//시작화면
+	if (start)
+	{
+		glViewport(0, 0, windowWidth, windowHeight);
+		pTransform3 = glm::mat4(1.0f);
+		pTransform3 = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+		glUniformMatrix4fv(projLocation, 1, GL_FALSE, &pTransform3[0][0]);
+		view3 = glm::lookAt(cameraPos3, cameraDirection3, cameraUp3);
+		glUniformMatrix4fv(viewLocation, 1, GL_FALSE, &view3[0][0]);
+		startTitle.draw(shaderProgramID, 8);
+	}
+	if (endpoint)
+	{
+		glViewport(0, 0, windowWidth, windowHeight);
+		pTransform3 = glm::mat4(1.0f);
+		pTransform3 = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+		glUniformMatrix4fv(projLocation, 1, GL_FALSE, &pTransform3[0][0]);
+		view3 = glm::lookAt(cameraPos3, cameraDirection3, cameraUp3);
+		glUniformMatrix4fv(viewLocation, 1, GL_FALSE, &view3[0][0]);
+		endTitle.draw(shaderProgramID, 9);
+	}
+	
 
 	glutSwapBuffers(); //--- 화면에 출력하기
 }
@@ -688,6 +709,7 @@ void InitBuffer()
 	//minicube.parent = &cube;
 	sphere.Init();
 	axis.Init();
+	//sphere.parent = &axis;
 	skybox.Init();
 	for (int i = 0; i < 7; i++)
 	{
@@ -825,8 +847,24 @@ void InitBuffer()
 		trampoline[i].depth = 5.0 / 2;
 		trampoline[i].height = 5.0 / 2;
 	}
+	for (int i = 0; i < jumpmapcubeNum; i++)
+	{
+		jumpmapcube[i].Init();
+		jumpmapcube[i].worldmatrix.position.y -= 0.5;
+		jumpmapcube[i].worldmatrix.position.z = 505 + i*10;
+		jumpmapcube[i].worldmatrix.scale = glm::vec3(11 - i, 0.3, (15 - i)/2);
+		jumpmapcube[i].width = (11 - i) / 2;
+		jumpmapcube[i].depth = 0.3 / 2;
+		jumpmapcube[i].height = ((12 - i) / 2) / 2;
+	}
+
+	startTitle.Init();
+	startTitle.worldmatrix.scale = glm::vec3(2, 2, 2);
+	endTitle.Init();
+	endTitle.worldmatrix.scale = glm::vec3(2, 2, 2);
 
 	sphere.worldmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
+	axis.modelmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
 
 	skybox.worldmatrix.scale = glm::vec3(200.0, 200.0, 200.0);
 
@@ -917,6 +955,12 @@ char* filetobuf(const char* file)
 GLvoid Keyboard(unsigned char key, int x, int y)
 {
 	switch (key) {
+	case 'a':
+		adminmode = !adminmode;
+		break;
+	case 's':
+		start = false;
+		break;
 	case 32:
 		if (JSelection == 0)
 		{
@@ -1088,248 +1132,280 @@ void collision()
 
 GLvoid TimerFunction(int value)
 {
+
 	switch (value)
 	{
 	case 1:
-		sphere.worldmatrix.scale = glm::vec3(1, 1, 1);
-		moveSphere();
-		if (JSelection == 1)
+		if (!start && !endpoint)
 		{
-			sphere.worldmatrix.position.y += jumpVelocity; // 구에 점프 속도 적용
-			//sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity, 1.0f);
-			sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity + jumpInitialVelocity/2, 1.0f);
-			// 중력 적용
-			jumpVelocity -= gravity;
-		}
-		// 카메라 위치 조정
-		cameraPos.x = sphere.worldmatrix.position.x + cameraDistance * sin(glm::radians(cameraAngle));
-		cameraPos.y = sphere.worldmatrix.position.y + cameraHeight + viewpoint * -3.1;
-		cameraPos.z = sphere.worldmatrix.position.z + cameraDistance * cos(glm::radians(cameraAngle)) + viewpoint * 17;
+			sphere.worldmatrix.scale = glm::vec3(1, 1, 1);
+			if (!falling || adminmode)
+			{
+				moveSphere();
+			}
+			
+			if (JSelection == 1)
+			{
+				sphere.worldmatrix.position.y += jumpVelocity; // 구에 점프 속도 적용
+				//sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity, 1.0f);
+				sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity + jumpInitialVelocity / 2, 1.0f);
+				// 중력 적용
+				jumpVelocity -= gravity;
+			}
+			// 카메라 위치 조정
+			cameraPos.x = sphere.worldmatrix.position.x + cameraDistance * sin(glm::radians(cameraAngle));
+			cameraPos.y = sphere.worldmatrix.position.y + cameraHeight + viewpoint * -3.1;
+			cameraPos.z = sphere.worldmatrix.position.z + cameraDistance * cos(glm::radians(cameraAngle)) + viewpoint * 17;
 
-		// 땅에 닿았을 때의 처리
-		if (sphere.worldmatrix.position.y <= initialHeight) {
-			sphere.worldmatrix.position.y = initialHeight;
-			jumpVelocity = jumpInitialVelocity; // 다시 초기 점프 속도로 설정
-			JSelection = 0;
-		}
-		
-		//회전하는 판
-		for (int i = 0; i < 5; i++)
-		{
-			if (i % 2 == 0)
-			{
-				rotatePlane[i].worldmatrix.rotation.y += 1;
+			// 땅에 닿았을 때의 처리
+			if (sphere.worldmatrix.position.y <= initialHeight) {
+				sphere.worldmatrix.position.y = initialHeight;
+				jumpVelocity = jumpInitialVelocity; // 다시 초기 점프 속도로 설정
+				JSelection = 0;
 			}
-			if (i % 2 == 1)
-			{
-				rotatePlane[i].worldmatrix.rotation.y -= 1;
-			}
-		}
-		//온-오프 판
-		for (int i = 0; i < onoffPlaneNum; i++)
-		{
-			onoffPlaneTime[i]++;
-			if (onoffPlaneTime[i] > 0 && onoffPlaneTime[i] < 200)
-			{
-				onoff[i] = true;
-			}
-			else if (onoffPlaneTime[i] > 200 && onoffPlaneTime[i] < 400)
-			{
-				onoff[i] = false;
-			}
-			else if (onoffPlaneTime[i] > 400)
-			{
-				onoffPlaneTime[i] = 0;
-			}
-		}
-		//펀치
-		for (int i = 0; i < punchNum; i++)
-		{
-			if (punchDirection[i] == 0)
+
+			//회전하는 판
+			for (int i = 0; i < 5; i++)
 			{
 				if (i % 2 == 0)
 				{
-					punch[i].worldmatrix.position.x += punchMoveCnt[i] * 3;
+					rotatePlane[i].worldmatrix.rotation.y += 1;
 				}
-				else if (i % 2 == 1)
+				if (i % 2 == 1)
 				{
-					punch[i].worldmatrix.position.x += punchMoveCnt[i];
+					rotatePlane[i].worldmatrix.rotation.y -= 1;
 				}
 			}
-			else if (punchDirection[i] == 1)
+			//온-오프 판
+			for (int i = 0; i < onoffPlaneNum; i++)
 			{
-				if (i % 2 == 0)
+				onoffPlaneTime[i]++;
+				if (onoffPlaneTime[i] > 0 && onoffPlaneTime[i] < 200)
 				{
-					punch[i].worldmatrix.position.x -= punchMoveCnt[i];
+					onoff[i] = true;
 				}
-				else if (i % 2 == 1)
+				else if (onoffPlaneTime[i] > 200 && onoffPlaneTime[i] < 400)
 				{
-					punch[i].worldmatrix.position.x -= punchMoveCnt[i]*3;
+					onoff[i] = false;
+				}
+				else if (onoffPlaneTime[i] > 400)
+				{
+					onoffPlaneTime[i] = 0;
 				}
 			}
-			if (punch[i].worldmatrix.position.x < -21)
-			{
-				punchDirection[i] = 0;
-			}
-			else if (punch[i].worldmatrix.position.x > 21)
-			{
-				punchDirection[i] = 1;
-			}
-		}
-
-		falling = true;
-		//충돌 체크
-		for (int i = 0; i < 7; i++)
-		{
-			if(((sphere.worldmatrix.position.x > (checkpoint[i].worldmatrix.position.x - checkpoint[i].width))
-				&& (sphere.worldmatrix.position.x < (checkpoint[i].worldmatrix.position.x + checkpoint[i].width))
-				&& (sphere.worldmatrix.position.z > (checkpoint[i].worldmatrix.position.z - checkpoint[i].height))
-				&& (sphere.worldmatrix.position.z < (checkpoint[i].worldmatrix.position.z + checkpoint[i].height)))
-				|| JSelection ==1 )
-			{
-				falling = false;
-				break;
-			}
-		}
-		for (int i = 0; i < 5; i++)	// rotatePlane
-		{
-			if (((sphere.worldmatrix.position.x > (rotatePlane[i].worldmatrix.position.x - rotatePlane[i].width))
-				&& (sphere.worldmatrix.position.x < (rotatePlane[i].worldmatrix.position.x + rotatePlane[i].width))
-				&& (sphere.worldmatrix.position.z > (rotatePlane[i].worldmatrix.position.z - rotatePlane[i].height))
-				&& (sphere.worldmatrix.position.z < (rotatePlane[i].worldmatrix.position.z + rotatePlane[i].height)))
-				|| JSelection == 1)
-			{
-				if (i % 2 == 0)
-				{
-
-				}
-				else if (i % 2 == 1)
-				{
-
-				}
-				falling = false;
-				break;
-			}
-		}
-		for (int i = 0; i < onoffPlaneNum; i++)	//on-off Plane
-		{
-			if (((sphere.worldmatrix.position.x > (onoffPlane[i].worldmatrix.position.x - onoffPlane[i].width))
-				&& (sphere.worldmatrix.position.x < (onoffPlane[i].worldmatrix.position.x + onoffPlane[i].width))
-				&& (sphere.worldmatrix.position.z > (onoffPlane[i].worldmatrix.position.z - onoffPlane[i].height))
-				&& (sphere.worldmatrix.position.z < (onoffPlane[i].worldmatrix.position.z + onoffPlane[i].height)))
-				|| JSelection == 1)
-			{
-				if (onoff[i])
-				{
-					falling = false;
-				}
-				break;
-			}
-		}
-		for (int i = 0; i < glassPlaneNum; i++)	//glassPlane
-		{
-			if (((sphere.worldmatrix.position.x > (glassPlane[i].worldmatrix.position.x - glassPlane[i].width))
-				&& (sphere.worldmatrix.position.x < (glassPlane[i].worldmatrix.position.x + glassPlane[i].width))
-				&& (sphere.worldmatrix.position.z > (glassPlane[i].worldmatrix.position.z - glassPlane[i].height))
-				&& (sphere.worldmatrix.position.z < (glassPlane[i].worldmatrix.position.z + glassPlane[i].height)))
-				|| JSelection == 1)
-			{
-				if (glassrandom[i] == 0)
-				{
-					falling = false;
-				}
-				else if (glassrandom[i] == 1)
-				{
-					glassrandom[i] = -1;
-				}
-				break;
-			}
-		}
-		//punch 발판
-		if (((sphere.worldmatrix.position.x > (punchPlane.worldmatrix.position.x - punchPlane.width))
-			&& (sphere.worldmatrix.position.x < (punchPlane.worldmatrix.position.x + punchPlane.width))
-			&& (sphere.worldmatrix.position.z > (punchPlane.worldmatrix.position.z - punchPlane.height))
-			&& (sphere.worldmatrix.position.z < (punchPlane.worldmatrix.position.z + punchPlane.height)))
-			|| JSelection == 1)
-		{
-			falling = false;
-		}
-		for (int i = 0; i < punchNum; i++)	//punch
-		{
-			if (((sphere.worldmatrix.position.x > (punch[i].worldmatrix.position.x - punch[i].width))
-				&& (sphere.worldmatrix.position.x < (punch[i].worldmatrix.position.x + punch[i].width))
-				&& (sphere.worldmatrix.position.z > (punch[i].worldmatrix.position.z - punch[i].height))
-				&& (sphere.worldmatrix.position.z < (punch[i].worldmatrix.position.z + punch[i].height)))
-				)
+			//펀치
+			for (int i = 0; i < punchNum; i++)
 			{
 				if (punchDirection[i] == 0)
 				{
-					sphere.worldmatrix.position.x += punchMoveCnt[i]*2;
+					if (i % 2 == 0)
+					{
+						punch[i].worldmatrix.position.x += punchMoveCnt[i] * 3;
+					}
+					else if (i % 2 == 1)
+					{
+						punch[i].worldmatrix.position.x += punchMoveCnt[i];
+					}
 				}
 				else if (punchDirection[i] == 1)
 				{
-					sphere.worldmatrix.position.x -= punchMoveCnt[i]*2;
+					if (i % 2 == 0)
+					{
+						punch[i].worldmatrix.position.x -= punchMoveCnt[i];
+					}
+					else if (i % 2 == 1)
+					{
+						punch[i].worldmatrix.position.x -= punchMoveCnt[i] * 3;
+					}
 				}
-				break;
+				if (punch[i].worldmatrix.position.x < -21)
+				{
+					punchDirection[i] = 0;
+				}
+				else if (punch[i].worldmatrix.position.x > 21)
+				{
+					punchDirection[i] = 1;
+				}
 			}
-		}
-		//점프대
-		
-		for (int i = 0; i < trampolineNum; i++)	//punch
-		{
-			if ((sphere.worldmatrix.position.x > (trampoline[i].worldmatrix.position.x - trampoline[i].width))
-				&& (sphere.worldmatrix.position.x < (trampoline[i].worldmatrix.position.x + trampoline[i].width))
-				&& (sphere.worldmatrix.position.z > (trampoline[i].worldmatrix.position.z - trampoline[i].height))
-				&& (sphere.worldmatrix.position.z < (trampoline[i].worldmatrix.position.z + trampoline[i].height))
-				&& (sphere.worldmatrix.position.y > (trampoline[i].worldmatrix.position.y - trampoline[i].depth))
-				&& (sphere.worldmatrix.position.y < (trampoline[i].worldmatrix.position.y + trampoline[i].depth)))
+
+			falling = true;
+			//충돌 체크
+			for (int i = 0; i < 7; i++)
+			{
+				if (((sphere.worldmatrix.position.x > (checkpoint[i].worldmatrix.position.x - checkpoint[i].width))
+					&& (sphere.worldmatrix.position.x < (checkpoint[i].worldmatrix.position.x + checkpoint[i].width))
+					&& (sphere.worldmatrix.position.z > (checkpoint[i].worldmatrix.position.z - checkpoint[i].height))
+					&& (sphere.worldmatrix.position.z < (checkpoint[i].worldmatrix.position.z + checkpoint[i].height)))
+					|| JSelection == 1)
+				{
+					falling = false;
+					if (i == 6)
+					{
+						endpoint = true;
+					}
+					break;
+				}
+			}
+			for (int i = 0; i < 5; i++)	// rotatePlane
+			{
+				if (((sphere.worldmatrix.position.x > (rotatePlane[i].worldmatrix.position.x - rotatePlane[i].width))
+					&& (sphere.worldmatrix.position.x < (rotatePlane[i].worldmatrix.position.x + rotatePlane[i].width))
+					&& (sphere.worldmatrix.position.z > (rotatePlane[i].worldmatrix.position.z - rotatePlane[i].height))
+					&& (sphere.worldmatrix.position.z < (rotatePlane[i].worldmatrix.position.z + rotatePlane[i].height)))
+					|| JSelection == 1)
+				{
+					if (i % 2 == 0)
+					{
+
+					}
+					else if (i % 2 == 1)
+					{
+
+					}
+					falling = false;
+					break;
+				}
+			}
+			for (int i = 0; i < onoffPlaneNum; i++)	//on-off Plane
+			{
+				if (((sphere.worldmatrix.position.x > (onoffPlane[i].worldmatrix.position.x - onoffPlane[i].width))
+					&& (sphere.worldmatrix.position.x < (onoffPlane[i].worldmatrix.position.x + onoffPlane[i].width))
+					&& (sphere.worldmatrix.position.z > (onoffPlane[i].worldmatrix.position.z - onoffPlane[i].height))
+					&& (sphere.worldmatrix.position.z < (onoffPlane[i].worldmatrix.position.z + onoffPlane[i].height)))
+					|| JSelection == 1)
+				{
+					if (onoff[i])
+					{
+						falling = false;
+					}
+					break;
+				}
+			}
+			for (int i = 0; i < glassPlaneNum; i++)	//glassPlane
+			{
+				if (((sphere.worldmatrix.position.x > (glassPlane[i].worldmatrix.position.x - glassPlane[i].width))
+					&& (sphere.worldmatrix.position.x < (glassPlane[i].worldmatrix.position.x + glassPlane[i].width))
+					&& (sphere.worldmatrix.position.z > (glassPlane[i].worldmatrix.position.z - glassPlane[i].height))
+					&& (sphere.worldmatrix.position.z < (glassPlane[i].worldmatrix.position.z + glassPlane[i].height)))
+					|| JSelection == 1)
+				{
+					if (glassrandom[i] == 0)
+					{
+						falling = false;
+					}
+					else if (glassrandom[i] == 1)
+					{
+						glassrandom[i] = -1;
+					}
+					break;
+				}
+			}
+			//punch 발판
+			if (((sphere.worldmatrix.position.x > (punchPlane.worldmatrix.position.x - punchPlane.width))
+				&& (sphere.worldmatrix.position.x < (punchPlane.worldmatrix.position.x + punchPlane.width))
+				&& (sphere.worldmatrix.position.z > (punchPlane.worldmatrix.position.z - punchPlane.height))
+				&& (sphere.worldmatrix.position.z < (punchPlane.worldmatrix.position.z + punchPlane.height)))
+				|| JSelection == 1)
 			{
 				falling = false;
-				jumpVelocity = 0.6;
-				break;
 			}
-		}
-		
-
-		//
-		/*if (sphere.worldmatrix.position.z >= 100 && sphere.worldmatrix.position.z < 200)
-		{
-			checknum = 1;
-		}
-		else if (sphere.worldmatrix.position.z >= 200 && sphere.worldmatrix.position.z < 300)
-		{
-			checknum = 2;
-		}
-		else if (sphere.worldmatrix.position.z >= 300 && sphere.worldmatrix.position.z < 400)
-		{
-			checknum = 3;
-		}
-		else if (sphere.worldmatrix.position.z >= 400 && sphere.worldmatrix.position.z < 500)
-		{
-			checknum = 4;
-		}
-		*/
-		
-		//테스트 확인용
-		checknum = 4;
-		cameraDirection.z = 1000;
-
-		//추락하기
-		if (falling)
-		{
-			fall += 0.3;
-			sphere.worldmatrix.position.y -= fall;
-			if (sphere.worldmatrix.position.y < -10)
+			for (int i = 0; i < punchNum; i++)	//punch
 			{
-				sphere.worldmatrix.position = checkpoint[checknum].worldmatrix.position;
-				falling = false;
-				fall = 0;
+				if (((sphere.worldmatrix.position.x > (punch[i].worldmatrix.position.x - punch[i].width))
+					&& (sphere.worldmatrix.position.x < (punch[i].worldmatrix.position.x + punch[i].width))
+					&& (sphere.worldmatrix.position.z > (punch[i].worldmatrix.position.z - punch[i].height))
+					&& (sphere.worldmatrix.position.z < (punch[i].worldmatrix.position.z + punch[i].height)))
+					)
+				{
+					if (punchDirection[i] == 0)
+					{
+						sphere.worldmatrix.position.x += punchMoveCnt[i] * 2;
+					}
+					else if (punchDirection[i] == 1)
+					{
+						sphere.worldmatrix.position.x -= punchMoveCnt[i] * 2;
+					}
+					break;
+				}
 			}
-		}
+			//점프대
+			for (int i = 0; i < trampolineNum; i++)	//punch
+			{
+				if ((sphere.worldmatrix.position.x > (trampoline[i].worldmatrix.position.x - trampoline[i].width))
+					&& (sphere.worldmatrix.position.x < (trampoline[i].worldmatrix.position.x + trampoline[i].width))
+					&& (sphere.worldmatrix.position.z > (trampoline[i].worldmatrix.position.z - trampoline[i].height))
+					&& (sphere.worldmatrix.position.z < (trampoline[i].worldmatrix.position.z + trampoline[i].height))
+					&& (sphere.worldmatrix.position.y > (trampoline[i].worldmatrix.position.y - trampoline[i].depth))
+					&& (sphere.worldmatrix.position.y < (trampoline[i].worldmatrix.position.y + trampoline[i].depth)))
+				{
+					falling = false;
+					jumpVelocity = 0.6;
+					break;
+				}
+			}
+			//피날레
+			for (int i = 0; i < jumpmapcubeNum; i++)	//glassPlane
+			{
+				if (((sphere.worldmatrix.position.x > (jumpmapcube[i].worldmatrix.position.x - jumpmapcube[i].width))
+					&& (sphere.worldmatrix.position.x < (jumpmapcube[i].worldmatrix.position.x + jumpmapcube[i].width))
+					&& (sphere.worldmatrix.position.z > (jumpmapcube[i].worldmatrix.position.z - jumpmapcube[i].height))
+					&& (sphere.worldmatrix.position.z < (jumpmapcube[i].worldmatrix.position.z + jumpmapcube[i].height)))
+					|| JSelection == 1)
+				{
+					falling = false;
+					break;
+				}
+			}
 
-		//큐브맵 같이 이동
-		skybox.worldmatrix.position = sphere.worldmatrix.position;
-		skybox.worldmatrix.position.z += 50;
+		
+			if (sphere.worldmatrix.position.z >= 100 && sphere.worldmatrix.position.z < 200)
+			{
+				checknum = 1;
+			}
+			else if (sphere.worldmatrix.position.z >= 200 && sphere.worldmatrix.position.z < 300)
+			{
+				checknum = 2;
+			}
+			else if (sphere.worldmatrix.position.z >= 300 && sphere.worldmatrix.position.z < 400)
+			{
+				checknum = 3;
+			}
+			else if (sphere.worldmatrix.position.z >= 400 && sphere.worldmatrix.position.z < 500)
+			{
+				checknum = 4;
+			}
+			else if (sphere.worldmatrix.position.z >= 500 && sphere.worldmatrix.position.z < 600)
+			{
+				checknum = 5;
+			}
+			else if (sphere.worldmatrix.position.z >= 600 && sphere.worldmatrix.position.z < 700)
+			{
+				checknum = 6;
+			}
+			
+			
+			//테스트 확인용
+			//checknum = 5;
+			//cameraDirection.z = 1000;
+
+			//추락하기
+			if (falling && !adminmode)
+			{
+				fall += 0.3;
+				sphere.worldmatrix.position.y -= fall;
+				if (sphere.worldmatrix.position.y < -10)
+				{
+					sphere.worldmatrix.position = checkpoint[checknum].worldmatrix.position;
+					falling = false;
+					fall = 0;
+				}
+			}
+
+			//큐브맵 같이 이동
+			skybox.worldmatrix.position = sphere.worldmatrix.position;
+			skybox.worldmatrix.position.z += 50;
+		}
+		
 
 		break;
 	}
@@ -1345,7 +1421,7 @@ void InitTexture()
 	stbi_set_flip_vertically_on_load(true);
 	glGenTextures(15, textures);
 
-	unsigned char* data1 = stbi_load("crystal.png", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data1 = stbi_load("crysta5.png", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[0]
 	glBindTexture(GL_TEXTURE_2D, textures[0]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1363,7 +1439,7 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data2); //---텍스처 이미지 정의
 
-	unsigned char* data3 = stbi_load("C.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data3 = stbi_load("crystal1.jpg", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[2]
 	glBindTexture(GL_TEXTURE_2D, textures[2]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1372,7 +1448,7 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data3); //---텍스처 이미지 정의
 
-	unsigned char* data4 = stbi_load("D.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data4 = stbi_load("crystal5.jpg", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[3]
 	glBindTexture(GL_TEXTURE_2D, textures[3]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1381,7 +1457,7 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data4); //---텍스처 이미지 정의
 
-	unsigned char* data5 = stbi_load("E.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data5 = stbi_load("crystal3.jpg", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[4]
 	glBindTexture(GL_TEXTURE_2D, textures[4]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1390,7 +1466,7 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data5); //---텍스처 이미지 정의
 
-	unsigned char* data6 = stbi_load("F.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data6 = stbi_load("crystal4.jpg", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[5]
 	glBindTexture(GL_TEXTURE_2D, textures[5]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1399,7 +1475,7 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data6); //---텍스처 이미지 정의
 
-	unsigned char* data7 = stbi_load("E.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data7 = stbi_load("1212.jpg", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[6]
 	glBindTexture(GL_TEXTURE_2D, textures[6]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1408,7 +1484,7 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data7); //---텍스처 이미지 정의
 
-	unsigned char* data8 = stbi_load("E.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data8 = stbi_load("crystal6.jpg", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[6]
 	glBindTexture(GL_TEXTURE_2D, textures[7]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1416,6 +1492,24 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data8); //---텍스처 이미지 정의
+
+	unsigned char* data9 = stbi_load("startview.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	//--- texture[6]
+	glBindTexture(GL_TEXTURE_2D, textures[8]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data9); //---텍스처 이미지 정의
+
+	unsigned char* data10 = stbi_load("endview.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	//--- texture[6]
+	glBindTexture(GL_TEXTURE_2D, textures[9]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data10); //---텍스처 이미지 정의
 
 	glUseProgram(shaderProgramID);
 	int tLocation = glGetUniformLocation(shaderProgramID, "outTexture"); //--- outTexture1 유니폼 샘플러의 위치를 가져옴
