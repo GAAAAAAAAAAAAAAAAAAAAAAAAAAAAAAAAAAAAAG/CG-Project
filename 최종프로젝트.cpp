@@ -22,6 +22,7 @@ mt19937 gen(rd());
 uniform_real_distribution<double> XYdis(-1, 1);
 uniform_real_distribution<double> dis(0.0, 1.0);
 uniform_int_distribution<int> onoffrandom(0, 400);
+uniform_int_distribution<int> glass(0, 1);
 
 void InitTexture();
 int widthImage, heightImage, numberOfChannel;
@@ -220,6 +221,9 @@ CUBE onoffPlane[51];
 int onoffPlaneNum = 51;
 int onoffPlaneTime[51];
 bool onoff[51];
+CUBE glassPlane[18];
+int glassPlaneNum = 18;
+int glassrandom[18];
 
 struct SPHERE :OBJECT
 {
@@ -497,6 +501,10 @@ void main(int argc, char** argv) //--- 윈도우 출력하고 콜백함수 설정
 	{
 		onoffPlane[i].ReadObj("cube.obj");
 	}
+	for (int i = 0; i < glassPlaneNum; i++)
+	{
+		glassPlane[i].ReadObj("cube.obj");
+	}
 
 	//--- 세이더 읽어와서 세이더 프로그램 만들기
 	make_shaderProgram(); //--- 세이더 프로그램 만들기
@@ -615,6 +623,13 @@ GLvoid drawScene()
 			onoffPlane[i].draw(shaderProgramID, 4);
 		}
 	}
+	for (int i = 0; i < glassPlaneNum; i++)
+	{
+		if (glassrandom[i] >= 0)
+		{
+			glassPlane[i].draw(shaderProgramID, 5);
+		}
+	}
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -700,6 +715,36 @@ void InitBuffer()
 		onoffPlane[i].height = 5.0 / 2;
 		onoffPlaneTime[i] = onoffrandom(gen);
 		onoff[i] = true;
+	}
+	for (int i = 0; i < glassPlaneNum; i++)
+	{
+		glassPlane[i].Init();
+		glassPlane[i].worldmatrix.position.y -= 0.5;
+		glassPlane[i].worldmatrix.position.z = (i % 9) * 10 + 210;
+		if (i >= 0 && i < 9)
+		{
+			glassPlane[i].worldmatrix.position.x = -5;
+		}
+		else if (i >= 9 && i < 18)
+		{
+			glassPlane[i].worldmatrix.position.x = 5;
+		}
+		glassPlane[i].worldmatrix.scale = glm::vec3(10.0, 0.3, 10.0);
+		glassPlane[i].width = 10.0 / 2;
+		glassPlane[i].depth = 0.3 / 2;
+		glassPlane[i].height = 10.0 / 2;
+		if (i < 9)
+		{
+			glassrandom[i] = glass(gen);
+			if (glassrandom[i] == 0)
+			{
+				glassrandom[i + 9] = 1;
+			}
+			if (glassrandom[i] == 1)
+			{
+				glassrandom[i + 9] = 0;
+			}
+		}
 	}
 
 	sphere.worldmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
@@ -1068,14 +1113,42 @@ GLvoid TimerFunction(int value)
 				break;
 			}
 		}
+		for (int i = 0; i < glassPlaneNum; i++)	//glassPlane
+		{
+			if (((sphere.worldmatrix.position.x > (glassPlane[i].worldmatrix.position.x - glassPlane[i].width))
+				&& (sphere.worldmatrix.position.x < (glassPlane[i].worldmatrix.position.x + glassPlane[i].width))
+				&& (sphere.worldmatrix.position.z > (glassPlane[i].worldmatrix.position.z - glassPlane[i].height))
+				&& (sphere.worldmatrix.position.z < (glassPlane[i].worldmatrix.position.z + glassPlane[i].height)))
+				|| JSelection == 1)
+			{
+				if (glassrandom[i] == 0)
+				{
+					falling = false;
+				}
+				else if (glassrandom[i] == 1)
+				{
+					glassrandom[i] = -1;
+				}
+				break;
+			}
+		}
 		//
-		/*if (sphere.worldmatrix.position.z > 100 && sphere.worldmatrix.position.z < 200)
+	/*	if (sphere.worldmatrix.position.z >= 100 && sphere.worldmatrix.position.z < 200)
 		{
 			checknum = 1;
+		}
+		else if (sphere.worldmatrix.position.z >= 200 && sphere.worldmatrix.position.z < 300)
+		{
+			checknum = 2;
+		}
+		else if (sphere.worldmatrix.position.z >= 300 && sphere.worldmatrix.position.z < 400)
+		{
+			checknum = 3;
 		}*/
 		
 		//테스트 확인용
-		checknum = 1;
+		checknum = 2;
+		cameraDirection.z = 500;
 
 		//추락하기
 		if (falling)
