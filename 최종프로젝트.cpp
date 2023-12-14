@@ -232,14 +232,6 @@ int punchDirection[4];
 double punchMoveCnt[4];
 CUBE trampoline[3];
 int trampolineNum = 3;
-bool onTrampoline = false;
-int trampolineCnt = 0;
-float trampolineSize = 0.1;
-const float trampolinegravity = 0.01f; // 중력 가속도
-const float trampolineinitialHeight = 0.5f; // 초기 높이
-const float trampolineInitialVelocity = 0.8f; // 초기 점프 속도
-float trampolineVelocity = trampolineInitialVelocity; // 점프 속도를 변화시킬 변수
-bool trampoling = false;
 
 struct SPHERE :OBJECT
 {
@@ -1101,7 +1093,7 @@ GLvoid TimerFunction(int value)
 	case 1:
 		sphere.worldmatrix.scale = glm::vec3(1, 1, 1);
 		moveSphere();
-		if (JSelection == 1 && !trampoling)
+		if (JSelection == 1)
 		{
 			sphere.worldmatrix.position.y += jumpVelocity; // 구에 점프 속도 적용
 			//sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity, 1.0f);
@@ -1115,7 +1107,6 @@ GLvoid TimerFunction(int value)
 		cameraPos.z = sphere.worldmatrix.position.z + cameraDistance * cos(glm::radians(cameraAngle)) + viewpoint * 17;
 
 		// 땅에 닿았을 때의 처리
-	
 		if (sphere.worldmatrix.position.y <= initialHeight) {
 			sphere.worldmatrix.position.y = initialHeight;
 			jumpVelocity = jumpInitialVelocity; // 다시 초기 점프 속도로 설정
@@ -1283,80 +1274,22 @@ GLvoid TimerFunction(int value)
 			}
 		}
 		//점프대
-		onTrampoline = false;
-		for (int i = 0; i < punchNum; i++)	//punch
+		
+		for (int i = 0; i < trampolineNum; i++)	//punch
 		{
-			if (((sphere.worldmatrix.position.x > (trampoline[i].worldmatrix.position.x - trampoline[i].width))
+			if ((sphere.worldmatrix.position.x > (trampoline[i].worldmatrix.position.x - trampoline[i].width))
 				&& (sphere.worldmatrix.position.x < (trampoline[i].worldmatrix.position.x + trampoline[i].width))
 				&& (sphere.worldmatrix.position.z > (trampoline[i].worldmatrix.position.z - trampoline[i].height))
-				&& (sphere.worldmatrix.position.z < (trampoline[i].worldmatrix.position.z + trampoline[i].height)))
-				&& sphere.worldmatrix.position.y < trampoline[i].worldmatrix.position.y + trampoline[i].depth)
+				&& (sphere.worldmatrix.position.z < (trampoline[i].worldmatrix.position.z + trampoline[i].height))
+				&& (sphere.worldmatrix.position.y > (trampoline[i].worldmatrix.position.y - trampoline[i].depth))
+				&& (sphere.worldmatrix.position.y < (trampoline[i].worldmatrix.position.y + trampoline[i].depth)))
 			{
-				sphere.worldmatrix.position.y = trampoline[i].worldmatrix.position.y + trampoline[i].depth + 0.1;
-				onTrampoline = true;
 				falling = false;
-				JSelection = 0;
-				trampolineCnt = 0;
+				jumpVelocity = 0.6;
 				break;
 			}
 		}
-		if (onTrampoline)
-		{
-			trampoling = true;
-		}
-		if (trampoling)
-		{
-			sphere.worldmatrix.position.y += trampolineVelocity;
-			trampolineCnt++;
-			if (trampolineCnt > 0 && trampolineCnt < 60)
-			{
-				trampolineVelocity = 0.6;
-			}
-			else if (trampolineCnt > 60 && trampolineCnt < 70)
-			{
-				trampolineVelocity = 0.0;
-			}
-			else if (trampolineCnt > 70 && trampolineCnt < 130)
-			{
-				trampolineVelocity = -0.6;
-			}
-			else if (trampolineCnt > 130)
-			{
-				trampolineCnt = 0;
-				trampolineVelocity = 0.6;
-				trampoling = false;
-			}
-		}
-		//if (trampoling)
-		//{
-		//	sphere.worldmatrix.position.y += trampolineVelocity;
-		//	sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + trampolineVelocity + trampolineInitialVelocity / 2, 1.0f);
-		//	trampolineVelocity -= gravity;
-		//}
-		//if (sphere.worldmatrix.position.y <= trampolineinitialHeight) {
-		//	sphere.worldmatrix.position.y = trampolineinitialHeight;
-		//	trampolineVelocity = trampolineInitialVelocity; // 다시 초기 점프 속도로 설정
-		//	trampoling = false;
-		//}
 		
-		
-		//if (JSelection == 1 && !onTrampoline)
-		//{
-		//	sphere.worldmatrix.position.y += jumpVelocity; // 구에 점프 속도 적용
-		//	//sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity, 1.0f);
-		//	sphere.worldmatrix.scale = glm::vec3(1.0f, 1.0f + jumpVelocity + jumpInitialVelocity / 2, 1.0f);
-		//	// 중력 적용
-		//	jumpVelocity -= gravity;
-		//}
-		//// 땅에 닿았을 때의 처리
-		//if (!onTrampoline)
-		//{
-		//	if (sphere.worldmatrix.position.y <= initialHeight) {
-		//		sphere.worldmatrix.position.y = initialHeight;
-		//		jumpVelocity = jumpInitialVelocity; // 다시 초기 점프 속도로 설정
-		//		JSelection = 0;
-		//	}
-		//}
 
 		//
 		/*if (sphere.worldmatrix.position.z >= 100 && sphere.worldmatrix.position.z < 200)
