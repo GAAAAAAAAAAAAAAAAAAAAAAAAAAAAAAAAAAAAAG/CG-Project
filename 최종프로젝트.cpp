@@ -22,6 +22,7 @@ mt19937 gen(rd());
 uniform_real_distribution<double> XYdis(-1, 1);
 uniform_real_distribution<double> dis(0.0, 1.0);
 uniform_int_distribution<int> onoffrandom(0, 400);
+uniform_int_distribution<int> glass(0, 1);
 
 void InitTexture();
 int widthImage, heightImage, numberOfChannel;
@@ -222,6 +223,7 @@ int onoffPlaneTime[51];
 bool onoff[51];
 CUBE glassPlane[18];
 int glassPlaneNum = 18;
+int glassrandom[18];
 
 struct SPHERE :OBJECT
 {
@@ -623,7 +625,10 @@ GLvoid drawScene()
 	}
 	for (int i = 0; i < glassPlaneNum; i++)
 	{
-		glassPlane[i].draw(shaderProgramID, 5);
+		if (glassrandom[i] >= 0)
+		{
+			glassPlane[i].draw(shaderProgramID, 5);
+		}
 	}
 
 	glEnable(GL_BLEND);
@@ -725,9 +730,21 @@ void InitBuffer()
 			glassPlane[i].worldmatrix.position.x = 5;
 		}
 		glassPlane[i].worldmatrix.scale = glm::vec3(10.0, 0.3, 10.0);
-		glassPlane[i].width = 5.0 / 2;
+		glassPlane[i].width = 10.0 / 2;
 		glassPlane[i].depth = 0.3 / 2;
-		glassPlane[i].height = 5.0 / 2;
+		glassPlane[i].height = 10.0 / 2;
+		if (i < 9)
+		{
+			glassrandom[i] = glass(gen);
+			if (glassrandom[i] == 0)
+			{
+				glassrandom[i + 9] = 1;
+			}
+			if (glassrandom[i] == 1)
+			{
+				glassrandom[i + 9] = 0;
+			}
+		}
 	}
 
 	sphere.worldmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
@@ -1096,8 +1113,27 @@ GLvoid TimerFunction(int value)
 				break;
 			}
 		}
+		for (int i = 0; i < glassPlaneNum; i++)	//glassPlane
+		{
+			if (((sphere.worldmatrix.position.x > (glassPlane[i].worldmatrix.position.x - glassPlane[i].width))
+				&& (sphere.worldmatrix.position.x < (glassPlane[i].worldmatrix.position.x + glassPlane[i].width))
+				&& (sphere.worldmatrix.position.z > (glassPlane[i].worldmatrix.position.z - glassPlane[i].height))
+				&& (sphere.worldmatrix.position.z < (glassPlane[i].worldmatrix.position.z + glassPlane[i].height)))
+				|| JSelection == 1)
+			{
+				if (glassrandom[i] == 0)
+				{
+					falling = false;
+				}
+				else if (glassrandom[i] == 1)
+				{
+					glassrandom[i] = -1;
+				}
+				break;
+			}
+		}
 		//
-		/*if (sphere.worldmatrix.position.z >= 100 && sphere.worldmatrix.position.z < 200)
+	/*	if (sphere.worldmatrix.position.z >= 100 && sphere.worldmatrix.position.z < 200)
 		{
 			checknum = 1;
 		}
