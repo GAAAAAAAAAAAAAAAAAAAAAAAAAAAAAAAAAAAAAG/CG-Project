@@ -26,7 +26,7 @@ uniform_int_distribution<int> glass(0, 1);
 
 void InitTexture();
 int widthImage, heightImage, numberOfChannel;
-unsigned int textures[8];
+unsigned int textures[15];
 
 struct Transform
 {
@@ -224,6 +224,12 @@ bool onoff[51];
 CUBE glassPlane[18];
 int glassPlaneNum = 18;
 int glassrandom[18];
+CUBE punchbox[4];
+CUBE punch[4];
+CUBE punchPlane;
+int punchNum = 4;
+int punchDirection[4];
+double punchMoveCnt[4];
 
 struct SPHERE :OBJECT
 {
@@ -505,6 +511,15 @@ void main(int argc, char** argv) //--- 윈도우 출력하고 콜백함수 설정
 	{
 		glassPlane[i].ReadObj("cube.obj");
 	}
+	for (int i = 0; i < punchNum; i++)
+	{
+		punchbox[i].ReadObj("cube.obj");
+	}
+	for (int i = 0; i < punchNum; i++)
+	{
+		punch[i].ReadObj("cube.obj");
+	}
+	punchPlane.ReadObj("cube.obj");
 
 	//--- 세이더 읽어와서 세이더 프로그램 만들기
 	make_shaderProgram(); //--- 세이더 프로그램 만들기
@@ -630,6 +645,12 @@ GLvoid drawScene()
 			glassPlane[i].draw(shaderProgramID, 5);
 		}
 	}
+	for (int i = 0; i < punchNum; i++)
+	{
+		punchbox[i].draw(shaderProgramID, 6);
+		punch[i].draw(shaderProgramID, 6);
+	}
+	punchPlane.draw(shaderProgramID, 6);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -746,6 +767,43 @@ void InitBuffer()
 			}
 		}
 	}
+	for (int i = 0; i < punchNum; i++)
+	{
+		punchbox[i].Init();
+		punchbox[i].worldmatrix.position.y -= 0.5;
+		punchbox[i].worldmatrix.position.z = i * 23 + 320;
+		if (i % 2 == 0)
+		{
+			punchbox[i].worldmatrix.position.x = -20;
+			punchDirection[i] = 0;
+		}
+		else if (i % 2 == 1)
+		{
+			punchbox[i].worldmatrix.position.x = 20;
+			punchDirection[i] = 1;
+		}
+		punchbox[i].worldmatrix.scale = glm::vec3(20.0, 20.0, 20.0);
+		punchbox[i].width = 20.0 / 2;
+		punchbox[i].depth = 20.0 / 2;
+		punchbox[i].height = 20.0 / 2;
+
+		punch[i].Init();
+		punch[i].worldmatrix.position = punchbox[i].worldmatrix.position;
+		punch[i].worldmatrix.position.y += 4;
+		punch[i].worldmatrix.scale = glm::vec3(10.0,10.0,10.0);
+		punch[i].width = 10.0 / 2;
+		punch[i].depth = 10.0 / 2;
+		punch[i].height = 10.0 / 2;
+
+		punchMoveCnt[i] = 0.2;
+	}
+	punchPlane.Init();
+	punchPlane.worldmatrix.position.y -= 0.6;
+	punchPlane.worldmatrix.position.z = 350;
+	punchPlane.worldmatrix.scale = glm::vec3(7.0, 0.2, 100.0);
+	punchPlane.width = 7.0 / 2;
+	punchPlane.depth = 0.3 / 2;
+	punchPlane.height = 100.0 / 2;
 
 	sphere.worldmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
 
@@ -1063,6 +1121,40 @@ GLvoid TimerFunction(int value)
 				onoffPlaneTime[i] = 0;
 			}
 		}
+		//펀치
+		for (int i = 0; i < punchNum; i++)
+		{
+			if (punchDirection[i] == 0)
+			{
+				if (i % 2 == 0)
+				{
+					punch[i].worldmatrix.position.x += punchMoveCnt[i] * 3;
+				}
+				else if (i % 2 == 1)
+				{
+					punch[i].worldmatrix.position.x += punchMoveCnt[i];
+				}
+			}
+			else if (punchDirection[i] == 1)
+			{
+				if (i % 2 == 0)
+				{
+					punch[i].worldmatrix.position.x -= punchMoveCnt[i];
+				}
+				else if (i % 2 == 1)
+				{
+					punch[i].worldmatrix.position.x -= punchMoveCnt[i]*3;
+				}
+			}
+			if (punch[i].worldmatrix.position.x < -21)
+			{
+				punchDirection[i] = 0;
+			}
+			else if (punch[i].worldmatrix.position.x > 21)
+			{
+				punchDirection[i] = 1;
+			}
+		}
 
 		falling = true;
 		//충돌 체크
@@ -1132,8 +1224,37 @@ GLvoid TimerFunction(int value)
 				break;
 			}
 		}
+		//punch 발판
+		if (((sphere.worldmatrix.position.x > (punchPlane.worldmatrix.position.x - punchPlane.width))
+			&& (sphere.worldmatrix.position.x < (punchPlane.worldmatrix.position.x + punchPlane.width))
+			&& (sphere.worldmatrix.position.z > (punchPlane.worldmatrix.position.z - punchPlane.height))
+			&& (sphere.worldmatrix.position.z < (punchPlane.worldmatrix.position.z + punchPlane.height)))
+			|| JSelection == 1)
+		{
+			falling = false;
+		}
+		for (int i = 0; i < punchNum; i++)	//glassPlane
+		{
+			if (((sphere.worldmatrix.position.x > (punch[i].worldmatrix.position.x - punch[i].width))
+				&& (sphere.worldmatrix.position.x < (punch[i].worldmatrix.position.x + punch[i].width))
+				&& (sphere.worldmatrix.position.z > (punch[i].worldmatrix.position.z - punch[i].height))
+				&& (sphere.worldmatrix.position.z < (punch[i].worldmatrix.position.z + punch[i].height)))
+				|| JSelection == 1)
+			{
+				if (punchDirection[i] == 0)
+				{
+					sphere.worldmatrix.position.x += punchMoveCnt[i];
+				}
+				else if (punchDirection[i] == 1)
+				{
+					sphere.worldmatrix.position.x -= punchMoveCnt[i];
+				}
+				break;
+			}
+		}
+
 		//
-	/*	if (sphere.worldmatrix.position.z >= 100 && sphere.worldmatrix.position.z < 200)
+		/*if (sphere.worldmatrix.position.z >= 100 && sphere.worldmatrix.position.z < 200)
 		{
 			checknum = 1;
 		}
@@ -1144,11 +1265,16 @@ GLvoid TimerFunction(int value)
 		else if (sphere.worldmatrix.position.z >= 300 && sphere.worldmatrix.position.z < 400)
 		{
 			checknum = 3;
-		}*/
+		}
+		else if (sphere.worldmatrix.position.z >= 400 && sphere.worldmatrix.position.z < 500)
+		{
+			checknum = 4;
+		}
+		*/
 		
 		//테스트 확인용
-		checknum = 2;
-		cameraDirection.z = 500;
+		checknum = 3;
+		cameraDirection.z = 1000;
 
 		//추락하기
 		if (falling)
@@ -1179,7 +1305,7 @@ void InitTexture()
 {
 	int widthimage1, heightimage1, numberOfChannel1;
 	stbi_set_flip_vertically_on_load(true);
-	glGenTextures(8, textures);
+	glGenTextures(15, textures);
 
 	unsigned char* data1 = stbi_load("crystal.png", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[0]
@@ -1235,7 +1361,7 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data6); //---텍스처 이미지 정의
 
-	unsigned char* data7 = stbi_load("stone.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data7 = stbi_load("E.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[6]
 	glBindTexture(GL_TEXTURE_2D, textures[6]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1244,7 +1370,7 @@ void InitTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, 3, widthimage1, heightimage1, 0, GL_RGB, GL_UNSIGNED_BYTE, data7); //---텍스처 이미지 정의
 
-	unsigned char* data8 = stbi_load("plain.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
+	unsigned char* data8 = stbi_load("E.bmp", &widthimage1, &heightimage1, &numberOfChannel1, 0);
 	//--- texture[6]
 	glBindTexture(GL_TEXTURE_2D, textures[7]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
