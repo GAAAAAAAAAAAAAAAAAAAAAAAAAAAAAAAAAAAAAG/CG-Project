@@ -211,6 +211,8 @@ struct CUBE :OBJECT
 CUBE cube;
 CUBE skybox;
 CUBE minicube;
+CUBE checkpoint[7];
+CUBE rotatePlane[5];
 
 struct SPHERE :OBJECT
 {
@@ -374,7 +376,7 @@ GLfloat XYZcolors[6][3] = { //--- 축 색상
 };
 
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, -4.0f); //--- 카메라 위치
-glm::vec3 cameraDirection = glm::vec3(0.0f, 0.0f, 100.0f); //--- 카메라 바라보는 방향
+glm::vec3 cameraDirection = glm::vec3(0.0f, 0.0f, 200.0f); //--- 카메라 바라보는 방향
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f); //--- 카메라 위쪽 방향
 
 glm::mat4 model = glm::mat4(1.0f);
@@ -416,7 +418,7 @@ float cameraAngle = 180.0f; // 카메라 각도
 bool start = true;
 
 float w, a, s, d;
-float speed = 0.05;
+float speed = 0.6;
 int JSelection = 0;
 int JCnt = 0;
 float jumpSize = 0.1;
@@ -472,6 +474,10 @@ void main(int argc, char** argv) //--- 윈도우 출력하고 콜백함수 설정
 	skybox.ReadObj("cube.obj");
 	minicube.ReadObj("cube.obj");
 	sphere.ReadObj("sphere.obj");
+	for (int i = 0; i < 7; i++)
+	{
+		checkpoint[i].ReadObj("cube.obj");
+	}
 
 	//--- 세이더 읽어와서 세이더 프로그램 만들기
 	make_shaderProgram(); //--- 세이더 프로그램 만들기
@@ -571,16 +577,19 @@ GLvoid drawScene()
 	model = glm::mat4(1.0f);
 	if (!viewpoint)
 	{
-
 		sphere.draw(shaderProgramID);
 	}
 	minicube.draw(shaderProgramID,1);
 	skybox.draw(shaderProgramID,1);
+	for (int i = 0; i < 7; i++)
+	{
+		checkpoint[i].draw(shaderProgramID, 2);
+	}
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	cube.draw(shaderProgramID, 1);
 	//투명도 그리고 싶으면 여기에 객체 그리기
+	//cube.draw(shaderProgramID, 1);
 	glDisable(GL_BLEND);
 
 	glutSwapBuffers(); //--- 화면에 출력하기
@@ -603,14 +612,22 @@ void InitBuffer()
 	//minicube.parent = &cube;
 	sphere.Init();
 	skybox.Init();
+	for (int i = 0; i < 7; i++)
+	{
+		checkpoint[i].Init();
+		checkpoint[i].worldmatrix.position.y -= 0.5;
+		checkpoint[i].worldmatrix.position.z = i * 100;
+		checkpoint[i].worldmatrix.scale = glm::vec3(7.0, 0.3, 7.0);
+	}
 
-	skybox.worldmatrix.position.y = 10;
-	skybox.worldmatrix.scale = glm::vec3(50.0, 50.0, 50.0);
+	sphere.worldmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
+
+	skybox.worldmatrix.scale = glm::vec3(200.0, 200.0, 200.0);
 
 	cube.worldmatrix.position.z = 10;
 
-	minicube.worldmatrix.position.z = -3;
-	minicube.modelmatrix.scale = glm::vec3(0.5, 0.5, 0.5);
+	minicube.worldmatrix.position.z = -7;
+	minicube.modelmatrix.scale = glm::vec3(0.35, 0.35, 0.35);
 }
 
 void make_shaderProgram()
@@ -694,12 +711,11 @@ char* filetobuf(const char* file)
 GLvoid Keyboard(unsigned char key, int x, int y)
 {
 	switch (key) {
-	case 'j':
+	case 32:
 		if (JSelection == 0)
 		{
 			JSelection = 1;
 		}
-		
 		break;
 	case 'v':
 		viewpoint = !viewpoint;
@@ -710,6 +726,8 @@ GLvoid Keyboard(unsigned char key, int x, int y)
 	}
 	glutPostRedisplay(); //--- 배경색이 바뀔 때마다 출력 콜백 함수를 호출하여 화면을 refresh 한다
 }
+
+bool spacePressed = true;
 
 GLvoid SpecialKeys(int key, int x, int y)
 {
@@ -725,6 +743,9 @@ GLvoid SpecialKeys(int key, int x, int y)
 		break;
 	case GLUT_KEY_RIGHT:
 		rightKeyPressed = true;
+		break;
+	case 32:
+		spacePressed = true;
 		break;
 	}
 	glutPostRedisplay(); // 화면 갱신
@@ -744,6 +765,9 @@ GLvoid SpecialKeysUp(int key, int x, int y) {
 	case GLUT_KEY_RIGHT:
 		rightKeyPressed = false;
 		break;
+	case 32:
+		spacePressed = false;
+		break;
 	}
 }
 
@@ -753,11 +777,13 @@ void moveSphere()
 	{
 		sphere.worldmatrix.position.z += speed;
 		sphere.modelmatrix.rotation.x += speed*50;
+		cameraDirection.z += speed;
 	}
 	if (downKeyPressed)
 	{
 		sphere.worldmatrix.position.z -= speed;
 		sphere.modelmatrix.rotation.x -= speed*50;
+		cameraDirection.z -= speed;
 	}
 	if (leftKeyPressed)
 	{
@@ -873,6 +899,10 @@ GLvoid TimerFunction(int value)
 			jumpVelocity = jumpInitialVelocity; // 다시 초기 점프 속도로 설정
 			JSelection = 0;
 		}
+
+		//큐브맵 같이 이동
+		skybox.worldmatrix.position = sphere.worldmatrix.position;
+		skybox.worldmatrix.position.z += 50;
 
 		break;
 	}
