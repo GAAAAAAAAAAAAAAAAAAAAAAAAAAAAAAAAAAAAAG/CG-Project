@@ -284,7 +284,7 @@ struct SPHERE :OBJECT
 		glBindVertexArray(vao);
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, textures[0]);
+		glBindTexture(GL_TEXTURE_2D, textures[2]);
 		glDrawArrays(GL_TRIANGLES, 0, vertex_count);
 	}
 
@@ -1132,7 +1132,6 @@ void collision()
 
 GLvoid TimerFunction(int value)
 {
-
 	switch (value)
 	{
 	case 1:
